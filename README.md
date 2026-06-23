@@ -28,58 +28,75 @@ Infrastructure hybride DevSecOps combinant :
 ## Architecture
 
 ### Lab On-Premises (Hyper-V)
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Hyper-V Host (Windows Local Lab)               │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  LAN-CYNA: 192.168.1.0/24                            │  │
-│  │                                                       │  │
-│  │  ┌──────────────┐  ┌──────────────┐                 │  │
-│  │  │ VM-pfSense   │  │ VM-AD-CYNA   │                 │  │
-│  │  │ 192.168.1.1  │  │ 192.168.1.10 │                 │  │
-│  │  │ - Firewall   │  │ - AD DS      │                 │  │
-│  │  │ - DHCP       │  │ - DNS Server │                 │  │
-│  │  │ - NAT        │  │ - cyna.local │                 │  │
-│  │  └──────────────┘  └──────────────┘                 │  │
-│  │                                                       │  │
-│  │  ┌──────────────────┐  ┌────────────────────────┐  │  │
-│  │  │ VM-DevOps-Linux  │  │ VM-SOC-Wazuh           │  │  │
-│  │  │ 192.168.1.102    │  │ 192.168.1.103          │  │  │
-│  │  │ - Docker Stack   │  │ - Wazuh Manager        │  │  │
-│  │  │ - Nginx (SaaS)   │  │ - Wazuh Indexer        │  │  │
-│  │  │ - DVWA           │  │ - Wazuh Dashboard      │  │  │
-│  │  │ - Prometheus     │  │ - SIEM/HIDS            │  │  │
-│  │  │ - Grafana        │  │                        │  │  │
-│  │  │ - Wazuh Agent    │  │                        │  │  │
-│  │  └──────────────────┘  └────────────────────────┘  │  │
-│  └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+
+```mermaid
+graph TB
+    subgraph HyperV["Hyper-V Host (Windows Local Lab)"]
+        subgraph LAN["LAN-CYNA: 192.168.1.0/24"]
+            pfSense["VM-pfSense<br/>192.168.1.1<br/>━━━━━━━━<br/>Firewall<br/>DHCP<br/>NAT"]
+            AD["VM-AD-CYNA<br/>192.168.1.10<br/>━━━━━━━━<br/>AD DS<br/>DNS Server<br/>cyna.local"]
+            DevOps["VM-DevOps-Linux<br/>192.168.1.102<br/>━━━━━━━━<br/>Docker Stack<br/>Nginx/DVWA<br/>Prometheus<br/>Grafana<br/>Wazuh Agent"]
+            Wazuh["VM-SOC-Wazuh<br/>192.168.1.103<br/>━━━━━━━━<br/>Wazuh Manager<br/>Wazuh Indexer<br/>Wazuh Dashboard<br/>SIEM/HIDS"]
+            
+            pfSense --- AD
+            pfSense --- DevOps
+            pfSense --- Wazuh
+            DevOps -."monitored by".-> Wazuh
+        end
+    end
+    
+    Internet(["Internet<br/>10.0.0.0/8"]) --> pfSense
+    
+    style pfSense fill:#e74c3c,color:#fff
+    style AD fill:#3498db,color:#fff
+    style DevOps fill:#2ecc71,color:#fff
+    style Wazuh fill:#9b59b6,color:#fff
+    style Internet fill:#95a5a6,color:#fff
 ```
 
 ### Cloud Target (AWS)
-```
-┌─────────────────────────────────────────────────────────┐
-│                   AWS Cloud (Production)                 │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │  VPC: 172.16.0.0/16                              │  │
-│  │  ┌─────────────────┐  ┌────────────────────┐    │  │
-│  │  │ EKS Cluster     │  │ RDS PostgreSQL     │    │  │
-│  │  │ Multi-AZ        │  │ Multi-AZ           │    │  │
-│  │  │ - SaaS App      │  │ - Comptabilité     │    │  │
-│  │  │ - e-Commerce    │  │ - Encrypted        │    │  │
-│  │  └─────────────────┘  └────────────────────┘    │  │
-│  │           │                     │                │  │
-│  │           └──────> Secrets Manager <─────────┘  │  │
-│  └──────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+
+```mermaid
+graph TB
+    subgraph AWS["AWS Cloud (Production) - eu-west-3"]
+        subgraph VPC["VPC: 172.16.0.0/16"]
+            subgraph AZ1["AZ eu-west-3a"]
+                EKS1["EKS Node"]
+                RDS1["RDS Primary"]
+            end
+            
+            subgraph AZ2["AZ eu-west-3b"]
+                EKS2["EKS Node"]
+                RDS2["RDS Standby"]
+            end
+            
+            EKS["EKS Cluster<br/>━━━━━━━━<br/>SaaS App<br/>e-Commerce"]
+            RDS["RDS PostgreSQL 15.4<br/>━━━━━━━━<br/>Comptabilité<br/>Encrypted<br/>Multi-AZ"]
+            Secrets["AWS Secrets Manager<br/>━━━━━━━━<br/>DB Credentials<br/>Auto-Rotation"]
+            
+            EKS --> EKS1
+            EKS --> EKS2
+            RDS --> RDS1
+            RDS1 -."replication".-> RDS2
+            
+            EKS -->|"read credentials"| Secrets
+            RDS -->|"stored in"| Secrets
+        end
+    end
+    
+    style EKS fill:#ff9900,color:#fff
+    style RDS fill:#336791,color:#fff
+    style Secrets fill:#dd344c,color:#fff
+    style AZ1 fill:#f0f0f0,stroke:#333
+    style AZ2 fill:#f0f0f0,stroke:#333
 ```
 
 ## Project Structure
 
 ```
 CYNA-GROUP-7/
-├── .github/workflows/       # CI/CD pipelines
-├── ansible/                 # Configuration management
+├── .github/workflows/      # CI/CD pipelines
+├── ansible/                # Configuration management
 │   ├── inventories/        # Host inventories
 │   ├── playbooks/          # Ansible playbooks
 │   └── ansible.cfg         # Ansible configuration
@@ -87,10 +104,10 @@ CYNA-GROUP-7/
 │   ├── prometheus/         # Prometheus config
 │   └── docker-compose.yml  # Service definitions
 ├── terraform/              # Infrastructure as Code (AWS)
-│   ├── aws-main.tf        # AWS Cloud infrastructure
-│   ├── aws-variables.tf   # AWS variables
-│   └── aws-outputs.tf     # AWS outputs
-└── docs/                  # Documentation
+│   ├── aws-main.tf         # AWS Cloud infrastructure
+│   ├── aws-variables.tf    # AWS variables
+│   └── aws-outputs.tf      # AWS outputs
+└── docs/                   # Documentation
     └── fiche_technique_lab.md
 ```
 
@@ -240,8 +257,8 @@ cd docker && docker compose config
 
 - [Quick Start](QUICKSTART.md)
 - [AWS Deployment](terraform/README-AWS.md)
-- [Commands Reference](COMMANDS.md)
 - [Technical Doc](docs/fiche_technique_lab.md)
+- [Hyper-V Lab Details](docs/LAB_HYPERV.md)
 - [Wazuh Official Docs](https://documentation.wazuh.com/)
 - [Prometheus Docs](https://prometheus.io/docs/)
 - [Grafana Docs](https://grafana.com/docs/)
@@ -281,13 +298,3 @@ curl -X POST http://localhost:9090/-/reload
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Team
-
-CYNA-GROUP-7
-
----
-
-<div align="center">
-Made with ❤️ by CYNA-GROUP-7
-</div>

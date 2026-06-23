@@ -165,22 +165,34 @@ Lab local sur Hyper-V (Windows) simulant un environnement de production avec :
 
 ## Schéma Réseau
 
-```
-                          Internet (10.0.0.0/8)
-                                 |
-                         +-------+-------+
-                         |  VM-pfSense   |
-                         |  192.168.1.1  |
-                         | WAN: 10.0.0.16|
-                         +-------+-------+
-                                 |
-                 ================+================ (LAN-CYNA: 192.168.1.0/24)
-                 |               |               |
-         +-------+-----+  +------+------+  +-----+--------+
-         | VM-AD-CYNA  |  | VM-DevOps   |  | VM-Wazuh    |
-         | .10         |  | .102        |  | .103        |
-         | AD + DNS    |  | Docker      |  | SIEM        |
-         +-------------+  +-------------+  +-------------+
+```mermaid
+graph TB
+    Internet(["Internet<br/>École Network<br/>10.0.0.0/8"])
+    
+    subgraph Hyper["Hyper-V Host"]
+        subgraph WAN["WAN Interface"]
+            pfWAN["pfSense WAN<br/>10.0.0.16/8<br/>DHCP"]        end
+        
+        subgraph LAN["LAN-CYNA: 192.168.1.0/24"]
+            pfLAN["pfSense LAN<br/>192.168.1.1<br/>Gateway/DHCP/NAT"]
+            AD["VM-AD-CYNA<br/>192.168.1.10<br/>AD + DNS"]            DevOps["VM-DevOps<br/>192.168.1.102<br/>Docker Stack"]
+            Wazuh["VM-Wazuh<br/>192.168.1.103<br/>SIEM"]
+            
+            pfLAN ---|"192.168.1.0/24"| AD
+            pfLAN ---|"192.168.1.0/24"| DevOps
+            pfLAN ---|"192.168.1.0/24"| Wazuh
+        end
+    end
+    
+    Internet --> pfWAN
+    pfWAN -."NAT".-> pfLAN
+    
+    style Internet fill:#95a5a6,color:#fff
+    style pfWAN fill:#e74c3c,color:#fff
+    style pfLAN fill:#e74c3c,color:#fff
+    style AD fill:#3498db,color:#fff
+    style DevOps fill:#2ecc71,color:#fff
+    style Wazuh fill:#9b59b6,color:#fff
 ```
 
 ---
