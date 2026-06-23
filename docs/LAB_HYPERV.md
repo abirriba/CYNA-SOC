@@ -171,11 +171,13 @@ graph TB
     
     subgraph Hyper["Hyper-V Host"]
         subgraph WAN["WAN Interface"]
-            pfWAN["pfSense WAN<br/>10.0.0.16/8<br/>DHCP"]        end
+            pfWAN["pfSense WAN<br/>10.0.0.16/8<br/>DHCP"]
+        end
         
         subgraph LAN["LAN-CYNA: 192.168.1.0/24"]
             pfLAN["pfSense LAN<br/>192.168.1.1<br/>Gateway/DHCP/NAT"]
-            AD["VM-AD-CYNA<br/>192.168.1.10<br/>AD + DNS"]            DevOps["VM-DevOps<br/>192.168.1.102<br/>Docker Stack"]
+            AD["VM-AD-CYNA<br/>192.168.1.10<br/>AD + DNS"]
+            DevOps["VM-DevOps<br/>192.168.1.102<br/>Docker Stack"]
             Wazuh["VM-Wazuh<br/>192.168.1.103<br/>SIEM"]
             
             pfLAN ---|"192.168.1.0/24"| AD
