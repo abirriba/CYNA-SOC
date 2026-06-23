@@ -1,0 +1,54 @@
+---
+- name: Deploy Wazuh Agent
+  hosts: agents
+  become: yes
+  vars:
+    wazuh_manager_ip: "10.0.1.10"
+    wazuh_agent_version: "4.7.0"
+
+  tasks:
+    - name: Add Wazuh repository
+      apt_repository:
+        repo: "deb https://packages.wazuh.com/4.x/apt/ stable main"
+        state: present
+        filename: wazuh
+      when: ansible_os_family == "Debian"
+
+    - name: Import Wazuh GPG key
+      apt_key:
+        url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Wazuh agent
+      apt:
+        name: "wazuh-agent={{ wazuh_agent_version }}-1"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Configure Wazuh agent
+      lineinfile:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<address>.*</address>'
+        line: "    <address>{{ wazuh_manager_ip }}</address>"
+        backrefs: yes
+
+    - name: Enable and start Wazuh agent
+      systemd:
+        name: wazuh-agent
+        enabled: yes
+        state: started
+
+    - name: Check Wazuh agent status
+      command: systemctl status wazuh-agent
+      register: wazuh_status
+      changed_when: false
+
+    - name: Display Wazuh agent status
+      debug:
+        var: wazuh_status.stdout_lines

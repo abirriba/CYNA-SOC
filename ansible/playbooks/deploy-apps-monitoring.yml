@@ -1,0 +1,97 @@
+---
+- name: Deploy Monitoring Stack (Prometheus & Grafana)
+  hosts: monitoring
+  become: yes
+  vars:
+    prometheus_version: "2.45.0"
+    grafana_version: "10.0.0"
+    prometheus_port: 9090
+    grafana_port: 3000
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Create monitoring directory
+      file:
+        path: /opt/monitoring
+        state: directory
+        mode: '0755'
+
+    - name: Copy docker-compose file
+      copy:
+        src: ../../docker/docker-compose.yml
+        dest: /opt/monitoring/docker-compose.yml
+        mode: '0644'
+
+    - name: Copy Prometheus configuration
+      copy:
+        src: ../../docker/prometheus/prometheus.yml
+        dest: /opt/monitoring/prometheus.yml
+        mode: '0644'
+
+    - name: Start monitoring stack
+      command: docker compose up -d
+      args:
+        chdir: /opt/monitoring
+
+    - name: Wait for Prometheus to be ready
+      uri:
+        url: "http://localhost:{{ prometheus_port }}/-/ready"
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 10
+      delay: 5
+      when: "'prometheus' in inventory_hostname"
+
+    - name: Wait for Grafana to be ready
+      uri:
+        url: "http://localhost:{{ grafana_port }}/api/health"
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 10
+      delay: 5
+      when: "'grafana' in inventory_hostname"
+
+    - name: Display monitoring URLs
+      debug:
+        msg:
+          - "Prometheus: http://{{ ansible_host }}:{{ prometheus_port }}"
+          - "Grafana: http://{{ ansible_host }}:{{ grafana_port }}"
