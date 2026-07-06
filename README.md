@@ -1,4 +1,4 @@
-# CYNA-GROUP-7 - Infrastructure Security & Monitoring Lab
+# CYNA-GROUP-2 - Infrastructure Security & Monitoring Lab
 
 ![Terraform](https://img.shields.io/badge/Terraform-1.5+-623CE4?logo=terraform)
 ![Ansible](https://img.shields.io/badge/Ansible-2.10+-EE0000?logo=ansible)
